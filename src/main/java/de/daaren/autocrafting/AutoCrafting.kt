@@ -10,11 +10,10 @@ class AutoCrafting : JavaPlugin() {
     }
 
     override fun onEnable() {
-//        Bukkit.getPluginManager().registerEvents(Timber, this)
         Bukkit.getPluginManager().registerEvents(Crafter, this)
 
         instance = this;
 
-        Logger.info("Enabled!")
+        Bukkit.getLogger().info("[AutoCrafting] Enabled!")
     }
 }

@@ -5,7 +5,6 @@ import org.bukkit.Material
 import org.bukkit.NamespacedKey
 import org.bukkit.block.*
 import org.bukkit.entity.EntityType
-import org.bukkit.entity.ItemFrame
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.block.BlockDispenseEvent
@@ -15,14 +14,15 @@ import org.bukkit.inventory.Recipe
 import org.bukkit.persistence.PersistentDataContainer
 import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.Plugin
+import java.util.logging.Logger
 
 object Crafter : Listener {
+    private val logger: Logger = Bukkit.getLogger()
     @EventHandler
     fun onPlace(e : HangingPlaceEvent) {
         if (e.entity.type != EntityType.ITEM_FRAME && e.entity.type != EntityType.GLOW_ITEM_FRAME) {
             return
         }
-        Logger.info("Test: ${e.entity.location.x}, ${e.entity.location.y}, ${e.entity.location.z}")
         if (e.block.type != Material.DISPENSER) {
             return
         }
@@ -38,8 +38,8 @@ object Crafter : Listener {
         container.set(key, PersistentDataType.INTEGER, 1)
 
         state.update()
-        // val i: ItemFrame = e.entity as ItemFrame TODO mark itemframe with glowstone dust and tag, disable dropping of glowstone dust
-        e.player!!.sendMessage("Created AutoCrafter at [${e.block.x}, ${e.block.y}, ${e.block.z}]!")
+        // val i: ItemFrame = e.entity as ItemFrame TODO mark itemframe with glowstone dust and tag, disable glowstone dust drop
+        e.player?.sendMessage("Created AutoCrafter at [${e.block.x}, ${e.block.y}, ${e.block.z}]!")
     }
 
     @EventHandler
@@ -59,17 +59,18 @@ object Crafter : Listener {
         // if target inventory is not full
         val run = Runnable {
             synchronized(this) {
-                val targetBlock = e.block.getRelative(BlockFace.DOWN)
-                if(targetBlock.state is Container) { // or item can stack
+                val direction = e.block.location.direction
+                val targetBlock = e.block.getRelative(direction.blockX, direction.blockY, direction.blockZ)
+                if(targetBlock.state is Container) {
                     val craftedItem: ItemStack? = craftItemFromInventory(e.block)
-                    Logger.info("Crafted Item: $craftedItem")
-                    (targetBlock.state as Container).inventory.addItem(craftedItem)
+                    if(craftedItem != null) {
+                        logger.finest("[AutoCrafting] Crafted Item: $craftedItem")
+                        (targetBlock.state as Container).inventory.addItem(craftedItem) // TODO handle items that couldn't be stored
+                    }
                 }
-
-
             }
         }
-        Bukkit.getScheduler().runTaskLater(AutoCrafting.instance as Plugin, run, 1) // Wait until dispensed item is placed back in next tick
+        Bukkit.getScheduler().runTaskLater(AutoCrafting.instance as Plugin, run, 1) // Wait until dispensed item is restored in next tick
 
     }
 
@@ -95,7 +96,7 @@ object Crafter : Listener {
         return null
     }
 
-    private fun mapFromInventory(inv: Array<ItemStack?>, countOnlyOnce: Boolean): Map<Material, Int> {
+    private fun mapFromInventory(inv: Array<ItemStack?>, countOnlyOnce: Boolean): Map<Material, Int> { // TODO viel zu kompliziert eigentlich
         val map = mutableMapOf<Material, Int>()
         for(item: ItemStack? in inv) {
             if(item?.type != null) {
@@ -127,47 +128,5 @@ object Crafter : Listener {
         }
     }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-//    @EventHandler TODO remove key when breaking ItemFrame
-//    fun onBreak(e : HangingBreakEvent) {
-//        if (e.entity.type != EntityType.ITEM_FRAME && e.entity.type != EntityType.GLOW_ITEM_FRAME) {
-//            return
-//        }
-//        Logger.info("Test: ${e.entity.location.x}, ${e.entity.location.y}, ${e.entity.location.z}")
-//        if (e.block.type != Material.DISPENSER) {
-//            return
-//        }
-//        if(e.block.state !is TileState)
-//            return
-//
-//        if(e.player == null)
-//            return
-//        val state: TileState = e.block.state as TileState
-//        val container: PersistentDataContainer = state.persistentDataContainer
-//        val key = NamespacedKey(AutoCrafting.instance as Plugin, "auto-crafter")
-//
-//        container.set(key, PersistentDataType.INTEGER, 1)
-//
-//        state.update()
-//
-//        e.player!!.sendMessage("Created AutoCrafter at [${e.block.x}, ${e.block.y}, ${e.block.z}]!")
-//    }
+//TODO remove key when breaking ItemFrame
 }
