@@ -6,13 +6,13 @@ import org.bukkit.plugin.java.JavaPlugin
 class AutoCrafting : JavaPlugin() {
     companion object {
         var instance: AutoCrafting? = null
-        private set;
+        private set
     }
 
     override fun onEnable() {
         Bukkit.getPluginManager().registerEvents(Crafter, this)
 
-        instance = this;
+        instance = this
 
         Bukkit.getLogger().info("[AutoCrafting] Enabled!")
     }
