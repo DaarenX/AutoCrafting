@@ -9,8 +9,11 @@ import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.block.BlockDispenseEvent
 import org.bukkit.event.hanging.HangingPlaceEvent
+import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.Recipe
+import org.bukkit.inventory.ShapedRecipe
+import org.bukkit.inventory.ShapelessRecipe
 import org.bukkit.persistence.PersistentDataContainer
 import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.Plugin
@@ -19,7 +22,7 @@ import java.util.logging.Logger
 object Crafter : Listener {
     private val logger: Logger = Bukkit.getLogger()
     @EventHandler
-    fun onPlace(e : HangingPlaceEvent) {
+    fun createAutoCrafter(e : HangingPlaceEvent) {
         if (e.entity.type != EntityType.ITEM_FRAME && e.entity.type != EntityType.GLOW_ITEM_FRAME) {
             return
         }
@@ -38,7 +41,6 @@ object Crafter : Listener {
         container.set(key, PersistentDataType.INTEGER, 1)
 
         state.update()
-        // val i: ItemFrame = e.entity as ItemFrame TODO mark itemframe with glowstone dust and tag, disable glowstone dust drop
         e.player?.sendMessage("Created AutoCrafter at [${e.block.x}, ${e.block.y}, ${e.block.z}]!")
     }
 
@@ -56,77 +58,58 @@ object Crafter : Listener {
 
         e.isCancelled = true
 
-        // if target inventory is not full
         val run = Runnable {
-            synchronized(this) {
+            synchronized(this) { //probably not needed
                 val direction = e.block.location.direction
                 val targetBlock = e.block.getRelative(direction.blockX, direction.blockY, direction.blockZ)
-                if(targetBlock.state is Container) {
-                    val craftedItem: ItemStack? = craftItemFromInventory(e.block)
-                    if(craftedItem != null) {
-                        logger.finest("[AutoCrafting] Crafted Item: $craftedItem")
-                        (targetBlock.state as Container).inventory.addItem(craftedItem) // TODO handle items that couldn't be stored
-                    }
+                if(targetBlock.state !is Container) {
+                    return@Runnable
                 }
+                val targetInv = (targetBlock.state as Container).inventory
+                val recipe: Recipe = getCraftingRecipeFromInventory(e.block) ?: return@Runnable
+                val sourceBlock = e.block.getRelative(BlockFace.UP)
+                if (sourceBlock.state !is Container) {
+                    return@Runnable
+                }
+                val sourceInv: Inventory = (sourceBlock.state as Container).inventory
+
+                if(!itemFitsInTargetInventory(targetInv, recipe.result) || !checkAndRemoveCraftingMaterialsFromSourceInventory(recipe, sourceInv)) {
+                    return@Runnable
+                }
+                targetInv.addItem(recipe.result)
             }
         }
         Bukkit.getScheduler().runTaskLater(AutoCrafting.instance as Plugin, run, 1) // Wait until dispensed item is restored in next tick
 
     }
 
-    private fun craftItemFromInventory(dispenserBlock: Block): ItemStack? {
+    private fun itemFitsInTargetInventory(targetInv: Inventory, item: ItemStack): Boolean {
+        val targetInvCopy = Bukkit.createInventory(null, targetInv.size)
+        targetInvCopy.storageContents = targetInv.storageContents.clone()
+        return targetInvCopy.addItem(item).isEmpty() // NotEmpty -> StepInventory is too tight 🥵🥵🥵
+    }
+
+    private fun getCraftingRecipeFromInventory(dispenserBlock : Block): Recipe? {
         val dispenser: Dispenser = dispenserBlock.state as Dispenser
         val inv = dispenser.inventory.storageContents
-        val server = AutoCrafting.instance!!.server
-
         val dLoc = dispenserBlock.location
-        val sourceBlock = dispenserBlock.getRelative(BlockFace.UP)
-        if (sourceBlock.state !is Container) {
-            return null
-        }
-        val sourceContainer: Container = sourceBlock.state as Container
-        val sourceInv: Array<ItemStack?> = sourceContainer.inventory.storageContents
-        val recipeItemsMap: Map<Material, Int> = mapFromInventory(inv, true)
-
-        val recipe: Recipe? = server.getCraftingRecipe(inv, dLoc.world!!)
-        if (recipe != null && sourceInventoryHasCraftingMaterials(recipeItemsMap, mapFromInventory(sourceInv, false))) {
-            removeItemsFromSourceInventory(recipeItemsMap, sourceInv)
-            return recipe.result
-        }
-        return null
+        return Bukkit.getCraftingRecipe(inv, dLoc.world!!)
     }
 
-    private fun mapFromInventory(inv: Array<ItemStack?>, countOnlyOnce: Boolean): Map<Material, Int> { // TODO viel zu kompliziert eigentlich
-        val map = mutableMapOf<Material, Int>()
-        for(item: ItemStack? in inv) {
-            if(item?.type != null) {
-                map[item.type] = (map[item.type] ?: 0) + (if (countOnlyOnce) 1 else item.amount)
+    private fun checkAndRemoveCraftingMaterialsFromSourceInventory(recipe: Recipe?, sourceInv: Inventory): Boolean {
+        val ingredients: Array<ItemStack> = when (recipe) {
+            is ShapelessRecipe -> recipe.ingredientList.toTypedArray()
+            is ShapedRecipe -> recipe.ingredientMap.values.toTypedArray()
+            else ->  {
+                logger.warning("[AutoCrafting] Recipe error") // shouldn't occur?
+                return false
             }
         }
-        return map
-    }
-
-
-    private fun sourceInventoryHasCraftingMaterials(recipeItemsMap: Map<Material, Int>, sourceInventoryMap: Map<Material, Int>): Boolean { // TODO replace with Inventory.contains
-        for ((item, amount) in recipeItemsMap) {
-            if((sourceInventoryMap[item] ?: 0) < amount) return false
-        }
+        val sourceInvCopy = Bukkit.createInventory(null,sourceInv.size)
+        sourceInvCopy.storageContents = sourceInv.storageContents.clone()
+        if(sourceInv.removeItem(*ingredients).isNotEmpty()) return false
+        sourceInv.removeItem(*ingredients)
+        logger.finest("[AutoCrafting] Crafted Item: ${recipe.result}")
         return true
     }
-
-    private fun removeItemsFromSourceInventory(recipeItemsMap: Map<Material, Int>, inv: Array<ItemStack?>) { // TODO replace with Inventory.remove
-        for ((item, amount) in recipeItemsMap) {
-            var remaining: Int = amount
-            for (slot: ItemStack? in inv.filter {it?.type == item}) {
-                if(slot!!.amount >= remaining) {
-                    slot.amount -= remaining
-                    break
-                }
-                remaining -= slot.amount
-                slot.amount = 0
-            }
-        }
-    }
-
-//TODO remove key when breaking ItemFrame
 }
