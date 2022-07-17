@@ -1,7 +1,6 @@
 name: AutoCrafting
 version: '${version}'
 main: de.daaren.autocrafting.AutoCrafting
-api-version: 1.18
+api-version: 1.19
 authors: [ Daaren ]
 website: daarenx.github.io
-depend: [kotlin-stdlib]
