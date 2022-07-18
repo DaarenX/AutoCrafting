@@ -4,11 +4,10 @@ import org.bukkit.Bukkit
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
 import org.bukkit.block.*
-import org.bukkit.entity.EntityType
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.block.BlockDispenseEvent
-import org.bukkit.event.hanging.HangingPlaceEvent
+import org.bukkit.event.block.BlockPlaceEvent
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.Recipe
@@ -21,27 +20,23 @@ import java.util.logging.Logger
 
 object Crafter : Listener {
     private val logger: Logger = Bukkit.getLogger()
-    @EventHandler
-    fun createAutoCrafter(e : HangingPlaceEvent) {
-        if (e.entity.type != EntityType.ITEM_FRAME && e.entity.type != EntityType.GLOW_ITEM_FRAME) {
-            return
-        }
-        if (e.block.type != Material.DISPENSER) {
-            return
-        }
-        if(e.block.state !is TileState)
-            return
 
-        if(e.player == null)
-            return
+    @EventHandler
+    fun placeAutoCrafter(e: BlockPlaceEvent) {
+        if(e.itemInHand.type != Material.DISPENSER) return
+
+        val key = NamespacedKey(AutoCrafting.instance as Plugin, "AutoCrafter")
+        e.player.sendMessage("${e.itemInHand}")
+        if(e.itemInHand.itemMeta?.persistentDataContainer?.has(key, PersistentDataType.INTEGER) != true) return
+
         val state: TileState = e.block.state as TileState
         val container: PersistentDataContainer = state.persistentDataContainer
-        val key = NamespacedKey(AutoCrafting.instance as Plugin, "is-auto-crafter")
+
 
         container.set(key, PersistentDataType.INTEGER, 1)
 
         state.update()
-        e.player?.sendMessage("Created AutoCrafter at [${e.block.x}, ${e.block.y}, ${e.block.z}]!")
+        e.player.sendMessage("Placed AutoCrafter at [${e.block.x}, ${e.block.y}, ${e.block.z}]!") // TODO remove
     }
 
     @EventHandler
@@ -51,7 +46,7 @@ object Crafter : Listener {
         }
         val state: TileState = e.block.state as TileState
         val container: PersistentDataContainer = state.persistentDataContainer
-        val key = NamespacedKey(AutoCrafting.instance as Plugin, "is-auto-crafter")
+        val key = NamespacedKey(AutoCrafting.instance as Plugin, "AutoCrafter")
         if(!container.has(key, PersistentDataType.INTEGER)) {
             return
         }
@@ -59,28 +54,25 @@ object Crafter : Listener {
         e.isCancelled = true
 
         val run = Runnable {
-            synchronized(this) { //probably not needed
-                val direction = e.block.location.direction
-                val targetBlock = e.block.getRelative(direction.blockX, direction.blockY, direction.blockZ)
-                if(targetBlock.state !is Container) {
-                    return@Runnable
-                }
-                val targetInv = (targetBlock.state as Container).inventory
-                val recipe: Recipe = getCraftingRecipeFromInventory(e.block) ?: return@Runnable
-                val sourceBlock = e.block.getRelative(BlockFace.UP)
-                if (sourceBlock.state !is Container) {
-                    return@Runnable
-                }
-                val sourceInv: Inventory = (sourceBlock.state as Container).inventory
-
-                if(!itemFitsInTargetInventory(targetInv, recipe.result) || !checkAndRemoveCraftingMaterialsFromSourceInventory(recipe, sourceInv)) {
-                    return@Runnable
-                }
-                targetInv.addItem(recipe.result)
+            val direction = e.block.location.direction
+            val targetBlock = e.block.getRelative(direction.blockX, direction.blockY, direction.blockZ)
+            if(targetBlock.state !is Container) {
+                return@Runnable
             }
+            val targetInv = (targetBlock.state as Container).inventory
+            val recipe: Recipe = getCraftingRecipeFromInventory(e.block) ?: return@Runnable
+            val sourceBlock = e.block.getRelative(BlockFace.UP)
+            if (sourceBlock.state !is Container) {
+                return@Runnable
+            }
+            val sourceInv: Inventory = (sourceBlock.state as Container).inventory
+
+            if(!itemFitsInTargetInventory(targetInv, recipe.result) || !checkAndRemoveCraftingMaterialsFromSourceInventory(recipe, sourceInv)) {
+                return@Runnable
+            }
+            targetInv.addItem(recipe.result)
         }
         Bukkit.getScheduler().runTaskLater(AutoCrafting.instance as Plugin, run, 1) // Wait until dispensed item is restored in next tick
-
     }
 
     private fun itemFitsInTargetInventory(targetInv: Inventory, item: ItemStack): Boolean {

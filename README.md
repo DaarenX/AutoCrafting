@@ -1,10 +1,14 @@
-# AutoCrafting Plugin (WIP)
+# AutoCrafting Plugin
 
-AutoCrafting adds AutoCrafter Blocks to Minecraft 🥵🥵🥵
+AutoCrafting adds AutoCrafters to Minecraft 🥵🥵🥵
 
-AutoCrafter Blocks are created by placing an ItemFrame on a Dispenser 🥶
+AutoCrafters can be crafted with this Recipe: 🥶
+
+![](img/crafting_recipe.png)
+
+And they work like this:
 
 ![](img/tutorial.png)
 
 TODO:
- - Crafting Recipe for AutoCrafters instead of having to place an ItemFrame
+ - Disable hoppers
