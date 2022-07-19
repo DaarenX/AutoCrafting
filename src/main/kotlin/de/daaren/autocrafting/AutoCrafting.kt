@@ -17,11 +17,9 @@ class AutoCrafting : JavaPlugin() {
     }
 
     override fun onEnable() {
+        instance = this
         Bukkit.getPluginManager().registerEvents(Crafter, this)
         addAutoCrafterRecipe()
-
-
-        instance = this
 
         Bukkit.getLogger().info("[AutoCrafting] Enabled!")
     }

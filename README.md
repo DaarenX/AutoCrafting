@@ -9,6 +9,3 @@ AutoCrafters can be crafted with this Recipe: 🥶
 And they work like this:
 
 ![](img/tutorial.png)
-
-TODO:
- - Disable hoppers
