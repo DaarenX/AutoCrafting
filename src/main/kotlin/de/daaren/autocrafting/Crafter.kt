@@ -6,13 +6,16 @@ import org.bukkit.NamespacedKey
 import org.bukkit.block.*
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
+import org.bukkit.event.block.BlockBreakEvent
 import org.bukkit.event.block.BlockDispenseEvent
+import org.bukkit.event.block.BlockDropItemEvent
 import org.bukkit.event.block.BlockPlaceEvent
 import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.Recipe
 import org.bukkit.inventory.ShapedRecipe
 import org.bukkit.inventory.ShapelessRecipe
+import org.bukkit.inventory.meta.ItemMeta
 import org.bukkit.persistence.PersistentDataContainer
 import org.bukkit.persistence.PersistentDataType
 import org.bukkit.plugin.Plugin
@@ -39,7 +42,7 @@ object Crafter : Listener {
     }
 
     @EventHandler
-    fun runCraftOnDispense(e: BlockDispenseEvent) {
+    fun breakAutoCrafter(e: BlockDropItemEvent) {
         if(e.block.state !is TileState) {
             return
         }
@@ -49,27 +52,53 @@ object Crafter : Listener {
         if(!container.has(key, PersistentDataType.INTEGER)) {
             return
         }
+        val item: ItemStack = e.items[0].itemStack
+        val meta: ItemMeta = item.itemMeta ?: return
+        meta.persistentDataContainer.set(key, PersistentDataType.INTEGER, 1)
+        item.itemMeta = meta
 
+    }
+
+    @EventHandler
+    fun runCraftOnDispense(e: BlockDispenseEvent) {
+        if(e.block.state !is TileState) {
+            return
+        }
+        val state: TileState = e.block.state as TileState
+        val container: PersistentDataContainer = state.persistentDataContainer
+        val key = NamespacedKey(AutoCrafting.instance as Plugin, "AutoCrafter")
+
+        if(!container.has(key, PersistentDataType.INTEGER)) {
+            return
+        }
+        logger.info("[AutoCrafting] AutoCrafter found")
         e.isCancelled = true
 
         val run = Runnable {
+
             val direction = e.block.location.direction
             val targetBlock = e.block.getRelative(direction.blockX, direction.blockY, direction.blockZ)
             if(targetBlock.state !is Container) {
                 return@Runnable
             }
+            logger.info("[AutoCrafting] TargetContainer found")
             val targetInv = (targetBlock.state as Container).inventory
             val recipe: Recipe = getCraftingRecipeFromInventory(e.block) ?: return@Runnable
+            logger.info("[AutoCrafting] Crafting recipe found: ${recipe.result}")
             val sourceBlock = e.block.getRelative(BlockFace.UP)
             if (sourceBlock.state !is Container) {
                 return@Runnable
             }
+            logger.info("[AutoCrafting] SourceContainer found")
             val sourceInv: Inventory = (sourceBlock.state as Container).inventory
 
             if(!itemFitsInTargetInventory(targetInv, recipe.result) || !checkAndRemoveCraftingMaterialsFromSourceInventory(recipe, sourceInv)) {
+                logger.info("[AutoCrafting] Item doesn't fit or not enough Crafting Materials")
                 return@Runnable
             }
+            logger.info("[AutoCrafting] Trying to add item to inventory")
             targetInv.addItem(recipe.result)
+            e.block.state.update()
         }
         Bukkit.getScheduler().runTaskLater(AutoCrafting.instance as Plugin, run, 1) // Wait until dispensed item is restored in next tick
     }
@@ -100,7 +129,7 @@ object Crafter : Listener {
         sourceInvCopy.storageContents = sourceInv.storageContents.clone()
         if(sourceInvCopy.removeItem(*ingredients).isNotEmpty()) return false
         sourceInv.removeItem(*ingredients)
-        logger.finest("[AutoCrafting] Crafted Item: ${recipe.result}")
+        logger.info("[AutoCrafting] Crafted Item: ${recipe.result}")
         return true
     }
 }

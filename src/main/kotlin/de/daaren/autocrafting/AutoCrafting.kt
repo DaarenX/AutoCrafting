@@ -48,7 +48,6 @@ class AutoCrafting : JavaPlugin() {
         recipe.setIngredient('C', Material.CRAFTING_TABLE)
         recipe.setIngredient('D', Material.DISPENSER)
 
-        // Finally, add the recipe to the bukkit recipes
         Bukkit.addRecipe(recipe)
     }
 }
