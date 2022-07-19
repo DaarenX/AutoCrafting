@@ -26,7 +26,6 @@ object Crafter : Listener {
         if(e.itemInHand.type != Material.DISPENSER) return
 
         val key = NamespacedKey(AutoCrafting.instance as Plugin, "AutoCrafter")
-        e.player.sendMessage("${e.itemInHand}")
         if(e.itemInHand.itemMeta?.persistentDataContainer?.has(key, PersistentDataType.INTEGER) != true) return
 
         val state: TileState = e.block.state as TileState
@@ -99,7 +98,7 @@ object Crafter : Listener {
         }
         val sourceInvCopy = Bukkit.createInventory(null,sourceInv.size)
         sourceInvCopy.storageContents = sourceInv.storageContents.clone()
-        if(sourceInv.removeItem(*ingredients).isNotEmpty()) return false
+        if(sourceInvCopy.removeItem(*ingredients).isNotEmpty()) return false
         sourceInv.removeItem(*ingredients)
         logger.finest("[AutoCrafting] Crafted Item: ${recipe.result}")
         return true
