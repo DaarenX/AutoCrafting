@@ -39,7 +39,6 @@ object Crafter : Listener {
         container.set(autoCrafterKey, PersistentDataType.INTEGER, 1)
 
         state.update()
-        e.player.sendMessage("Placed AutoCrafter at [${e.block.x}, ${e.block.y}, ${e.block.z}]!") // TODO remove
     }
 
     @EventHandler
@@ -119,7 +118,7 @@ object Crafter : Listener {
     private fun itemFitsInTargetInventory(targetInv: Inventory, item: ItemStack): Boolean {
         val targetInvCopy = Bukkit.createInventory(null, targetInv.size)
         targetInvCopy.storageContents = targetInv.storageContents.clone()
-        return targetInvCopy.addItem(item).isEmpty() // NotEmpty -> StepInventory is too tight 🥵🥵🥵
+        return targetInvCopy.addItem(item).isEmpty()
     }
 
     private fun getCraftingRecipeFromInventory(dispenserBlock : Block): Recipe? {
@@ -140,7 +139,7 @@ object Crafter : Listener {
         }
         val sourceInvCopy = Bukkit.createInventory(null,sourceInv.size)
         sourceInvCopy.storageContents = sourceInv.storageContents.clone()
-        if(sourceInvCopy.removeItem(*ingredients).isNotEmpty()) return false
+        if (sourceInvCopy.removeItem(*ingredients).isNotEmpty()) return false
         sourceInv.removeItem(*ingredients)
         logger.info("[AutoCrafting] Crafted Item: ${recipe.result}")
         return true
